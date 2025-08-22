@@ -13,13 +13,21 @@ export default function Ranking() {
         async function carregarAlunos() {
             try {
                 const snap = await getDocs(collection(db, 'alunos'));
-                const lista: Aluno[] = snap.docs.map(doc => ({
-                    id: doc.id,
-                    ...(doc.data() as any)
-                }));
+                const lista: Aluno[] = snap.docs.map(doc => {
+                    const data = doc.data() as Omit<Aluno, 'id'>;
+                    return {
+                        id: doc.id,
+                        nome: data.nome ?? '',
+                        pokemon: data.pokemon ?? 'Desconhecido',
+                        evoluidoPara: data.evoluidoPara ?? data.pokemon ?? 'Desconhecido',
+                        nivelEvolucao: data.nivelEvolucao ?? 1,
+                        pontos: data.pontos ?? 0,
+                    };
+                });
                 setAlunos(lista);
-            } catch (e) {
-                console.error('Erro ao buscar ranking:', e);
+            } catch (e: unknown) {
+                const mensagem = e instanceof Error ? e.message : String(e);
+                console.error('Erro ao buscar ranking:', mensagem);
             } finally {
                 setLoading(false);
             }
@@ -29,8 +37,8 @@ export default function Ranking() {
 
     if (loading) return <p className="text-center mt-10">Carregando ranking...</p>;
 
-    // Agrupar por Pokémon
-    const grupos = alunos.reduce((acc, aluno) => {
+    // Agrupar por Pokémon garantindo string como chave
+    const grupos = alunos.reduce((acc: Record<string, Aluno[]>, aluno) => {
         const poke = aluno.pokemon ?? 'Desconhecido';
         if (!acc[poke]) acc[poke] = [];
         acc[poke].push(aluno);
@@ -41,6 +49,7 @@ export default function Ranking() {
     Object.keys(grupos).forEach(poke => {
         grupos[poke].sort((a, b) => (b.pontos ?? 0) - (a.pontos ?? 0));
     });
+
 
     return (
         <div className="max-w-3xl mx-auto mt-10 p-6 bg-white rounded-2xl shadow space-y-8">
@@ -58,10 +67,10 @@ export default function Ranking() {
                                 <span>
                                     <strong>{index + 1}º</strong> - {aluno.nome}
                                     <span className="ml-2 text-sm text-gray-500">
-                                        ({aluno.nivelEvolucao ?? '—'})
+                                        (Nível {aluno.nivelEvolucao})
                                     </span>
                                 </span>
-                                <span className="font-bold">{aluno.pontos ?? 0} pts</span>
+                                <span className="font-bold">{aluno.pontos} pts</span>
                             </li>
                         ))}
                     </ul>

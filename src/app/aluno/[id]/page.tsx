@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import type { Aluno } from '@/types/aluno';
 
-// Cadeias de evolução (inclui todos os estágios para tolerar dados antigos)
+// Cadeias de evolução
 const cadeias: Record<string, string[]> = {
     Bulbasaur: ['Bulbasaur', 'Ivysaur', 'Venusaur'],
     Ivysaur: ['Bulbasaur', 'Ivysaur', 'Venusaur'],
@@ -26,7 +26,7 @@ function calcularEvolucao(base: string, pontos: number) {
     const idx = Math.min(Math.floor(pontos / 100), cadeia.length - 1);
     return {
         nome: cadeia[idx],
-        nivel: idx + 1, // 1, 2 ou 3
+        nivel: idx + 1,
     };
 }
 
@@ -55,11 +55,20 @@ export default function DetalheAluno() {
                 if (!snap.exists()) {
                     setErro('Aluno não encontrado');
                 } else {
-                    setAluno({ id: snap.id, ...(snap.data() as any) });
+                    const data = snap.data() as Omit<Aluno, 'id'>;
+                    setAluno({
+                        id: snap.id,
+                        nome: data.nome ?? '',
+                        pokemon: data.pokemon ?? 'Bulbasaur',
+                        evoluidoPara: data.evoluidoPara ?? data.pokemon ?? 'Bulbasaur',
+                        nivelEvolucao: data.nivelEvolucao ?? 1,
+                        pontos: data.pontos ?? 0,
+                    });
                 }
-            } catch (e: any) {
-                console.error('Erro ao buscar aluno:', e);
-                setErro(e?.message ?? 'Erro desconhecido');
+            } catch (e: unknown) {
+                const mensagem = e instanceof Error ? e.message : 'Erro desconhecido';
+                console.error('Erro ao buscar aluno:', mensagem);
+                setErro(mensagem);
             } finally {
                 setLoading(false);
             }
@@ -79,12 +88,11 @@ export default function DetalheAluno() {
                 const snap = await tx.get(ref);
                 if (!snap.exists()) throw new Error('Aluno não encontrado');
 
-                const data = snap.data() as any;
-                const pontosAtuais = typeof data.pontos === 'number' ? data.pontos : 0;
-                const novoTotal = Math.max(0, pontosAtuais + pontosAlterar); // não deixa negativo
+                const data = snap.data() as Omit<Aluno, 'id'>;
+                const pontosAtuais = data.pontos ?? 0;
+                const novoTotal = Math.max(0, pontosAtuais + pontosAlterar);
 
-                // Base da cadeia: preferimos o campo "pokemon" (inicial). Se não houver, usamos a evolução atual.
-                const base = (data.pokemon as string) ?? (data.evoluidoPara as string) ?? 'Bulbasaur';
+                const base = data.pokemon ?? aluno.pokemon ?? 'Bulbasaur';
                 const { nome: evolucaoAtual, nivel } = calcularEvolucao(base, novoTotal);
 
                 tx.update(ref, {
@@ -103,17 +111,17 @@ export default function DetalheAluno() {
                         pontos: resultado.novoTotal,
                         evoluidoPara: resultado.evolucaoAtual,
                         nivelEvolucao: resultado.nivel,
-                        // garante que o campo pokemon esteja no estado local
-                        pokemon: (prev as any).pokemon ?? resultado.base,
+                        pokemon: resultado.base,
                     }
                     : prev
             );
 
             setPontosAlterar(0);
             alert('Pontos e evolução atualizados!');
-        } catch (e: any) {
-            console.error('Erro ao atualizar pontos:', e);
-            alert(`Erro ao atualizar pontos: ${e?.message ?? e}`);
+        } catch (e: unknown) {
+            const mensagem = e instanceof Error ? e.message : String(e);
+            console.error('Erro ao atualizar pontos:', mensagem);
+            alert(`Erro ao atualizar pontos: ${mensagem}`);
         } finally {
             setAtualizando(false);
         }
@@ -133,10 +141,10 @@ export default function DetalheAluno() {
             </button>
 
             <h1 className="text-2xl font-semibold">{aluno.nome}</h1>
-            <p><strong>Pokémon inicial:</strong> {(aluno as any).pokemon ?? '—'}</p>
-            <p><strong>Evolução atual:</strong> {aluno.evoluidoPara ?? (aluno as any).pokemon ?? '—'}</p>
-            <p><strong>Nível de evolução:</strong> {aluno.nivelEvolucao ?? '—'}</p>
-            <p><strong>Pontos:</strong> {aluno.pontos ?? 0}</p>
+            <p><strong>Pokémon inicial:</strong> {aluno.pokemon}</p>
+            <p><strong>Evolução atual:</strong> {aluno.evoluidoPara}</p>
+            <p><strong>Nível de evolução:</strong> {aluno.nivelEvolucao}</p>
+            <p><strong>Pontos:</strong> {aluno.pontos}</p>
 
             <div className="space-y-2 mt-4">
                 <input
@@ -152,7 +160,9 @@ export default function DetalheAluno() {
                 <button
                     onClick={handleAtualizarPontos}
                     disabled={atualizando}
-                    className={`w-full py-2 rounded-xl text-white transition ${atualizando ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                    className={`w-full py-2 rounded-xl text-white transition ${atualizando
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : 'bg-green-600 hover:bg-green-700'
                         }`}
                 >
                     {atualizando ? 'Atualizando...' : 'Atualizar Pontos'}

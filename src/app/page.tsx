@@ -18,10 +18,17 @@ export default function HomePage() {
         const ref = collection(db, 'alunos');
         const q = query(ref, orderBy('nome'));
         const snap = await getDocs(q);
-        const itens: Aluno[] = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
+        // Aqui tipamos corretamente cada documento
+        const itens: Aluno[] = snap.docs.map(doc => {
+          const data = doc.data() as Omit<Aluno, 'id'>; // pegando todos os campos exceto id
+          return { id: doc.id, ...data };
+        });
+
         setAlunos(itens);
-      } catch (e: any) {
-        setErro(e?.message ?? 'Erro ao carregar alunos');
+      } catch (e: unknown) {
+        const mensagem = e instanceof Error ? e.message : 'Erro ao carregar alunos';
+        setErro(mensagem);
       } finally {
         setLoading(false);
       }
@@ -32,10 +39,11 @@ export default function HomePage() {
   const filtrados = useMemo(() => {
     const t = termo.trim().toLowerCase();
     if (!t) return alunos;
+
     return alunos.filter(
       a =>
         a.nome?.toLowerCase().includes(t) ||
-        a.pokemon?.toLowerCase().includes(t) // 🔥 busca também pelo Pokémon
+        a.pokemon?.toLowerCase().includes(t)
     );
   }, [alunos, termo]);
 

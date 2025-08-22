@@ -5,28 +5,31 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
+const pokemons = ['Bulbasaur', 'Squirtle', 'Charmander'];
+
 export default function CadastrarAluno() {
     const [nome, setNome] = useState('');
-    const [pokemon, setPokemon] = useState('');
-    const [nivelEvolucao, setNivelEvolucao] = useState<number | ''>('');
-    const [pontos, setPontos] = useState<number | ''>('');
+    const [pokemon, setPokemon] = useState<string>('');
+    const [nivelEvolucao, setNivelEvolucao] = useState<number>(1);
+    const [pontos, setPontos] = useState<number>(0);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
     const handleSalvar = async () => {
-        if (!nome) return alert('O nome é obrigatório');
+        if (!nome.trim()) return alert('O nome é obrigatório');
         if (!pokemon) return alert('Selecione um Pokémon');
 
         setLoading(true);
         try {
             await addDoc(collection(db, 'alunos'), {
-                nome,
+                nome: nome.trim(),
                 pokemon,
-                nivelEvolucao: nivelEvolucao === '' ? 1 : nivelEvolucao, // se não preencher começa no nível 1
-                pontos: pontos === '' ? 0 : pontos
+                evoluidoPara: pokemon, // começa igual ao inicial
+                nivelEvolucao,
+                pontos
             });
             alert('Aluno cadastrado com sucesso!');
-            router.push('/'); // volta pra página inicial
+            router.push('/'); // volta para a página inicial
         } catch (e) {
             console.error(e);
             alert('Erro ao cadastrar aluno');
@@ -47,23 +50,26 @@ export default function CadastrarAluno() {
                 className="w-full rounded-xl border px-4 py-2"
             />
 
-            {/* Select de Pokémon fixo */}
             <select
                 value={pokemon}
                 onChange={(e) => setPokemon(e.target.value)}
                 className="w-full rounded-xl border px-4 py-2"
             >
                 <option value="">Selecione um Pokémon</option>
-                <option value="Bulbasaur">Bulbasaur</option>
-                <option value="Squirtle">Squirtle</option>
-                <option value="Blastoise">Blastoise</option>
+                {pokemons.map((p) => (
+                    <option key={p} value={p}>
+                        {p}
+                    </option>
+                ))}
             </select>
 
             <input
                 type="number"
                 placeholder="Nível de evolução"
                 value={nivelEvolucao}
-                onChange={(e) => setNivelEvolucao(Number(e.target.value))}
+                min={1}
+                max={3}
+                onChange={(e) => setNivelEvolucao(Number(e.target.value) || 1)}
                 className="w-full rounded-xl border px-4 py-2"
             />
 
@@ -71,7 +77,8 @@ export default function CadastrarAluno() {
                 type="number"
                 placeholder="Pontos"
                 value={pontos}
-                onChange={(e) => setPontos(Number(e.target.value))}
+                min={0}
+                onChange={(e) => setPontos(Number(e.target.value) || 0)}
                 className="w-full rounded-xl border px-4 py-2"
             />
 
